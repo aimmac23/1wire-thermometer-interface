@@ -45,7 +45,7 @@ def application(environ, start_response):
         
         if('Q:' not in result):
             status = '500 Internal Server Error'
-            response_body = 'Inappropriate response when scanning 1-Wire bus: ' % result
+            response_body = 'Inappropriate response when scanning 1-Wire bus: %s' % result
             send_response(start_response, status, response_body)
             return [response_body]
 
