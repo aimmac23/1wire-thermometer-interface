@@ -39,9 +39,18 @@ def application(environ, start_response):
         out_endpoint = usb.util.find_descriptor(interface, custom_match = lambda e: 
         usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
         
-        # May as well start out with a scan
+        # Find out how many buses the device has/supports
+        out_endpoint.write('B')
+        result = "".join(map(chr, in_endpoint.read(40, timeout=500)))
+        if('B' not in result):
+            status = "500 Internal Server Error"
+            response_body = "Inappropriate response when enumerating 1-Wire bus count: %s" % result
+            send_response(start_response, status, response_body)
+            return [response_body]
+        
+        # Scan all the 1-Wire busses
         out_endpoint.write('Q')
-        result = "".join(map(chr, in_endpoint.read(30, timeout=500)))
+        result = "".join(map(chr, in_endpoint.read(40, timeout=500)))
         
         if('Q:' not in result):
             status = '500 Internal Server Error'
@@ -49,27 +58,39 @@ def application(environ, start_response):
             send_response(start_response, status, response_body)
             return [response_body]
 
-        deviceCount = int(re.search("Q: (.*)", result).group(1))
+        deviceCountString = re.search("Q: (.*)", result).group(1)
+        
+        deviceCount = map(int, deviceCountString.split(","))
+        
 
+        # Convert temperature
         out_endpoint.write('Z')            
-        result = "".join(map(chr, in_endpoint.read(30, timeout=5000)))
+        result = "".join(map(chr, in_endpoint.read(40, timeout=5000)))
         if(result != "ACK"):
             status = '500 Internal Server Error'
             response_body = 'Inappropriate response when calulating temperatures: %s' % result
             send_response(start_response, status, response_body)
             return [response_body]
             
-        device_data = {}
-        for index in range(0, deviceCount):
-            out_endpoint.write("X%s" % str(index))
-            result = "".join(map(chr, in_endpoint.read(30, timeout=500)))
-            capture = re.search("X: (.*) T: (.*)", result)
-            address = capture.group(1)
-            temperature = capture.group(2)
-            device_data.update({address: temperature})
-            
+        json_response = {}        
         
-        response_body = json.dumps(device_data)
+        for bus in range(0, len(deviceCount)):
+            bus_devices = {}
+            for index in range(0, deviceCount[bus]):
+                out_endpoint.write("X%s,%s" % (str(bus), str(index)))
+                result = "".join(map(chr, in_endpoint.read(40, timeout=500)))
+                print result
+                
+                if "NACK" in result:
+                    bus_devices.update({"Error for device %s" % str(index): result})
+                    continue
+                capture = re.search("X: (.*) T: (.*)", result)
+                address = capture.group(1)
+                temperature = capture.group(2)
+                bus_devices.update({address: temperature})
+            json_response[bus] = bus_devices                
+        
+        response_body = json.dumps(json_response)
         status = "200 OK"
         send_response(start_response, status, response_body)
         return [response_body]
