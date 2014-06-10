@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 
+
+import os
+import sys
+
+sys.path.append(os.path.dirname(__file__))
+
 import temperaturejson
 from temperaturejson import send_response
 import json
@@ -7,7 +13,7 @@ import _mysql
 
 def reparsedata(data):
     nodedata = []
-    for entry in reparsedata.items():
+    for entry in data.items():
         busid = entry[0]
         nodes = entry[1]
         
@@ -15,39 +21,39 @@ def reparsedata(data):
             nodedata.append({'address': node[0], 'temperature': node[1], 'bus': busid})
     return nodedata
     
-def mergedata(availablenodes, currentnodes):
-    
-    for node in availablenodes:
+def mergedata(databasenodes, currentnodes):
+    for node in databasenodes:
         
         def nodematches(candidate, current=node):
-            return node.address == candidate.address
+            return current['address'] == candidate['address']
             
-        othernode = next((x for x in seq if nodematches(x)), None)
+        othernode = next((x for x in currentnodes if nodematches(x)), None)
             
-        if othernode is None:
-            node.temperature = othernode.temperature
+        if othernode is not None:
+            print othernode
+            node['temperature'] = othernode['temperature']
         else:
-            node.temperature = "XX";
-            node.broken = True
-    return availablenodes
+            node['temperature'] = "XX";
+            node['broken'] = True
+    return databasenodes
 
 def application(environ, start_response):  
-    
+    global otherstatus
     otherstatus = None
     
     def responseCapture(status, headers): 
         global otherstatus
         otherstatus = status;     
     
-    jsontemp = temperaturejson.application(None, responseCapture)
+    jsontemp = temperaturejson.application(None, responseCapture)[0]
     
-    if(otherstatus is not 200):
-        send_response(start_response, 500, "Fail")
-        return "Fail"
+    if("200" not in otherstatus):
+        send_response(start_response, "500 Internal Server Error", jsontemp)
+        return [jsontemp]
 
     jsontemperature = json.loads(jsontemp)
 
-    curent_temperatures = reparsedata(jsontemperature)
+    current_temperatures = reparsedata(jsontemperature)
 
     db=_mysql.connect(user="sensors",
                   passwd="crankhardware",db="temperaturesensors")
@@ -57,9 +63,10 @@ def application(environ, start_response):
     rows = r.fetch_row(maxrows=0)
     
     def hydrate(row): return {'address': row[0], 'bus': row[1], 'name': row[2]}
-    availablenodes = map(hydrate, rows)
+    databasenodes = map(hydrate, rows)
 
-    data_to_render = mergedata(availablenodes, current_temperatures)
-    
-    send_response(start_response, 200, data_to_render)
-    return data_to_render
+    data_to_render = mergedata(databasenodes, current_temperatures)
+
+    stringresult = json.dumps(data_to_render)    
+    send_response(start_response, "200 OK", stringresult)
+    return [stringresult]
