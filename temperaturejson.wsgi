@@ -17,11 +17,7 @@ def send_response(start_response, status, response_body):
 
 # This is our application object. It could have any name,
 # except when using mod_wsgi where it must be "application"
-def application(environ, start_response):  
-    
-    d = parse_qs(environ['QUERY_STRING'])
-    
-    param1 = d.get("command", [])
+def application(environ, start_response):
     
     dev = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a)
     
