@@ -9,7 +9,13 @@ import usb.core
 import usb.util
 
 def send_response(start_response, status, response_body):
-        response_headers = [('Content-Type', 'text/plain'),
+        if "200" in status:
+            content_type = "application/json"
+        else:
+            print "Returning plain text"
+            content_type = "text/plain" 
+
+        response_headers = [('Content-Type', content_type ),
                   ('Content-Length', str(len(response_body))),
                    ("Cache-Control",  "no-cache, must-revalidate")]  
                    
