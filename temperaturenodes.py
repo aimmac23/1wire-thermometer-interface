@@ -67,6 +67,6 @@ def application(environ, start_response):
 
     data_to_render = mergedata(databasenodes, current_temperatures)
 
-    stringresult = json.dumps(data_to_render)    
+    stringresult = json.dumps(data_to_render, sort_keys=True, indent=4, separators=(',', ': '))    
     send_response(start_response, "200 OK", stringresult)
     return [stringresult]
