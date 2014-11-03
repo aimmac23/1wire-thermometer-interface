@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from wsgiref.simple_server import make_server
-from cgi import parse_qs, escape
 import re
 import json
 
@@ -18,11 +17,7 @@ def send_response(start_response, status, response_body):
 # This is our application object. It could have any name,
 # except when using mod_wsgi where it must be "application"
 def application(environ, start_response):  
-    
-    d = parse_qs(environ['QUERY_STRING'])
-    
-    param1 = d.get("command", [])
-    
+            
     dev = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a)
     
     if dev == None:
@@ -61,7 +56,6 @@ def application(environ, start_response):
         deviceCountString = re.search("Q: (.*)", result).group(1)
         
         deviceCount = map(int, deviceCountString.split(","))
-        
 
         # Convert temperature
         out_endpoint.write('Z')            
@@ -76,19 +70,26 @@ def application(environ, start_response):
         
         for bus in range(0, len(deviceCount)):
             bus_devices = {}
-            for index in range(0, deviceCount[bus]):
-                out_endpoint.write("X%s,%s" % (str(bus), str(index)))
-                result = "".join(map(chr, in_endpoint.read(40, timeout=500)))
-                print result
-                
-                if "NACK" in result:
-                    bus_devices.update({"Error for device %s" % str(index): result})
-                    continue
-                capture = re.search("X: (.*) T: (.*)", result)
-                address = capture.group(1)
-                temperature = capture.group(2)
-                bus_devices.update({address: temperature})
+            
+            if(deviceCount[bus] == 255):
+                bus_devices = "BUS_ERROR";
+            else:
+                for index in range(0, deviceCount[bus]):
+                    out_endpoint.write("X%s,%s" % (str(bus), str(index)))
+                    result = "".join(map(chr, in_endpoint.read(40, timeout=500)))
+                    print result
+                    
+                    if "NACK" in result:
+                        bus_devices.update({"Error for device %s" % str(index): result})
+                        continue
+                    capture = re.search("X: (.*) T: (.*)", result)
+                    address = capture.group(1)
+                    temperature = capture.group(2)
+                    bus_devices.update({address: temperature})
             json_response[bus] = bus_devices                
+        
+        # Release the device
+        usb.util.dispose_resources(dev)
         
         response_body = json.dumps(json_response)
         status = "200 OK"
