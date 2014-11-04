@@ -7,6 +7,8 @@ import json
 import usb.core
 import usb.util
 
+import usb.backend.libusb0 as libusb0
+
 def send_response(start_response, status, response_body):
         if "200" in status:
             content_type = "application/json"
@@ -24,7 +26,7 @@ def send_response(start_response, status, response_body):
 # except when using mod_wsgi where it must be "application"
 def application(environ, start_response):  
     
-    dev = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a)
+    dev = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a, backend=libusb0.get_backend())
     
     if dev == None:
         status = '500 Internal Error'
