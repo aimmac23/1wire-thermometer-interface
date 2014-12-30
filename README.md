@@ -7,6 +7,7 @@ This library isn't much use without the custom hardware it was coded for.
 
 Requirements:
  * Something involving WSGI - I personally install it in an Apache
+ * PyUSB - http://sourceforge.net/projects/pyusb/
  * libusb0 to be installed (native library).
  * For Linux, a new udev rule to be added to allow access to the device:
  
