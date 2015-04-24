@@ -26,15 +26,13 @@ def send_response(start_response, status, response_body):
 # except when using mod_wsgi where it must be "application"
 def application(environ, start_response):  
     
-    dev = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a, backend=libusb0.get_backend())
-    
-    if dev == None:
-        status = '500 Internal Error'
-        response_body = "The USB device is not plugged in!"
-        send_response(start_response, status, response_body)
-        return [response_body]
+    controllers = usb.core.find(idVendor=0x04d8, idProduct=0x0f1a, backend=libusb0.get_backend(), find_all=True)
 
-    else:
+    resultJson = {}
+    controllerIndex = 0;
+    for dev in controllers:
+        controllerIndex = controllerIndex + 1;
+        
         cfg = dev.get_active_configuration()
         interface = cfg[(0,0)]
         in_endpoint = usb.util.find_descriptor(interface, custom_match = lambda e: 
@@ -73,9 +71,7 @@ def application(environ, start_response):
             response_body = 'Inappropriate response when calulating temperatures: %s' % result
             send_response(start_response, status, response_body)
             return [response_body]
-            
-        json_response = {}        
-        
+                    
         for bus in range(0, len(deviceCount)):
             bus_devices = {}
             
@@ -94,15 +90,15 @@ def application(environ, start_response):
                     address = capture.group(1)
                     temperature = capture.group(2)
                     bus_devices.update({address: temperature})
-            json_response[bus] = bus_devices                
+            resultJson["%s_%s" % (controllerIndex, bus)] = bus_devices                
         
         # Release the device
         usb.util.dispose_resources(dev)
         
-        response_body = json.dumps(json_response)
-        status = "200 OK"
-        send_response(start_response, status, response_body)
-        return [response_body]
+    response_body = json.dumps(resultJson)
+    status = "200 OK"
+    send_response(start_response, status, response_body)
+    return [response_body]
         
 
 
